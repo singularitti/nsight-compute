@@ -1,0 +1,108 @@
+Identifier: "InstructionStats"
+DisplayName: "Instruction Statistics"
+Description: "Statistics of the executed low-level assembly instructions (SASS). The instruction mix provides insight into the types and frequency of the executed instructions. A narrow mix of instruction types implies a dependency on few instruction pipelines, while others remain unused. Using multiple pipelines allows hiding latencies and enables parallel execution. Note that 'Instructions/Opcode' and 'Executed Instructions' are measured differently and can diverge if cycles are spent in system calls."
+Order: 60
+Sets {
+  Identifier: "full"
+}
+MetricDefinitions {
+    MetricDefinitions {
+      Name : "sass__inst_executed_register_spilling_op_read"
+      Expression : "simplify(sass__inst_executed_register_spilling_mem_local_op_read) + simplify(sass__inst_executed_register_spilling_mem_shared_op_read)"
+    }
+    MetricDefinitions{
+      Name : "sass__inst_executed_register_spilling_op_write"
+      Expression : "simplify(sass__inst_executed_register_spilling_mem_local_op_write) + simplify(sass__inst_executed_register_spilling_mem_shared_op_write)"
+    }
+    MetricDefinitions {
+      Name : "sass__inst_executed_register_spilling_mem_local"
+      Expression : "simplify(sass__inst_executed_register_spilling_mem_local_op_read) + simplify(sass__inst_executed_register_spilling_mem_local_op_write)"
+    }
+    MetricDefinitions{
+      Name : "sass__inst_executed_register_spilling_mem_shared"
+      Expression : "simplify(sass__inst_executed_register_spilling_mem_shared_op_read) + simplify(sass__inst_executed_register_spilling_mem_shared_op_write)"
+    }
+}
+Metrics {
+  Metrics {
+    Label: "Instructions Executed"
+    Name: "inst_executed"
+  }
+}
+Header {
+  Metrics {
+    Label: "Executed Instructions"
+    Name: "smsp__inst_executed.sum"
+  }
+  Metrics {
+    Label: "Avg. Executed Instructions Per Scheduler"
+    Name: "smsp__inst_executed.avg"
+  }
+  Metrics {
+    Label: "Issued Instructions"
+    Name: "smsp__inst_issued.sum"
+  }
+  Metrics {
+    Label: "Avg. Issued Instructions Per Scheduler"
+    Name: "smsp__inst_issued.avg"
+  }
+  Metrics {
+    Label: "Local Memory Spilling Requests"
+    Name: "sass__inst_executed_register_spilling_mem_local"
+  }
+  Metrics {
+    Label: "Shared Memory Spilling Requests"
+    Name: "sass__inst_executed_register_spilling_mem_shared"
+  }
+}
+Body {
+  DisplayName: "Opcode Category Chart"
+  SetDefault: true
+  Items {
+      BarChart {
+        Label: "Executed Instruction Categories"
+        CategoryAxis {
+          Label: "Opcode Categories"
+        }
+        ValueAxis {
+          Label: "Executed Warp-Level Instructions/Opcode"
+        }
+        ValueAxisAlignment: ValueAxisAlignments_Both
+        Metrics {
+          Label: "Executed Instructions by SASS Opcode Category"
+          Name: "sass__inst_executed_per_opcode_category"
+          ShowInstances: 1
+        }
+      }
+      Filter {
+        CollectionFilter {
+          CollectionScopes: CollectionScope_Launch
+          CollectionScopes: CollectionScope_Cmdlist
+        }
+      }
+  }
+}
+Body {
+  DisplayName: "Opcode Charts"
+  Items {
+    HorizontalContainer {
+      Items {
+        BarChart {
+          Label: "Executed Instruction Mix"
+          CategoryAxis {
+            Label: "Opcodes"
+          }
+          ValueAxis {
+            Label: "Executed Warp-Level Instructions/Opcode"
+          }
+          ValueAxisAlignment: ValueAxisAlignments_Both
+          Metrics {
+            Label: "Executed Warp-Level Instructions By Basic SASS Opcode"
+            Name: "sass__inst_executed_per_opcode"
+            ShowInstances: 1
+          }
+        }
+      }
+    }
+  }
+}

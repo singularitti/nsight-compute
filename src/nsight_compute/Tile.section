@@ -1,0 +1,306 @@
+Identifier: "Tile"
+DisplayName: "Tile Statistics"
+Description: "Tile kernel launch configuration, execution information and GPU resource usage. Tile kernels are translated into Tile IR (Tile Intermediate Representation), an extension to the CUDA programming model that enables first-class support for tile programming."
+Order: 9
+Sets {
+  Identifier: "detailed"
+}
+Sets {
+  Identifier: "full"
+}
+
+Filter {
+  CollectionFilter {
+    CollectionScopes: CollectionScope_Launch
+    CollectionScopes: CollectionScope_Range
+    CollectionScopes: CollectionScope_Cmdlist
+  }
+}
+
+Header {
+  Metrics {
+    Label: "Launch Execution Model"
+    Name: "launch__execution_model"
+    ShowInstances: 1
+  }
+  Metrics {
+    Label: "#Tile Blocks Specified"
+    Name: "launch__user_grid_size"
+    Filter {
+      CollectionFilter {
+        CollectionScopes: CollectionScope_Launch
+        CollectionScopes: CollectionScope_Range
+      }
+    }
+  }
+  Metrics{
+    Label: "#Thread Blocks Launched"
+    Name: "launch__grid_size"
+    Filter {
+      CollectionFilter {
+        CollectionScopes: CollectionScope_Launch
+        CollectionScopes: CollectionScope_Range
+      }
+    }
+  }
+  Metrics {
+    Label: "Block Size (Chosen by Compiler)"
+    Name: "launch__block_size"
+  }
+  Metrics {
+    Label: "Cluster Size"
+    Name: "launch__cluster_size"
+    Filter {
+      MinArch: CC_90
+      CollectionFilter {
+        CollectionScopes: CollectionScope_Launch
+        CollectionScopes: CollectionScope_Range
+      }
+    }
+  }
+  Metrics {
+    Label: "Blocks as Clusters"
+    Name: "launch__uses_blocks_as_clusters"
+  }
+}
+Body {
+  DisplayName: "Tile Configuration Details"
+  SetDefault: true
+  Items {
+    SuffixTable {
+      Label: "Tile Launch Configuration"
+      Suffixes {
+        Suffix {
+          Label: "X"
+          Name: "_x"
+        }
+        Suffix {
+          Label: "Y"
+          Name: "_y"
+        }
+        Suffix {
+          Label: "Z"
+          Name: "_z"
+        }
+      }
+      BaseNames {
+        BaseName {
+          Label: "#Tile Blocks Specified"
+          Name: "launch__user_grid_dim"
+        }
+        BaseName {
+          Label: "#Thread Blocks Launched"
+          Name: "launch__grid_dim"
+        }
+        BaseName {
+          Label: "Block Size"
+          Name: "launch__block_dim"
+        }
+        BaseName {
+          Label: "Cluster Dim"
+          Name: "launch__cluster_dim"
+          Filter {
+            MinArch: CC_90
+            CollectionFilter {
+              CollectionScopes: CollectionScope_Launch
+              CollectionScopes: CollectionScope_Range
+            }
+          }
+        }
+      }
+    }
+  }
+  Items {
+    Table {
+      Label: "GPU Resource Usage"
+      Columns: 2
+      Metrics {
+        Label: "Tensor Core (TC) Pipe Utilization"
+        Name: "sm__pipe_tc_cycles_active.avg.pct_of_peak_sustained_elapsed"
+        Filter {
+          Items {
+            MinArch: CC_100
+            MaxArch: CC_100
+          }
+          Items {
+            MinArch: CC_103
+            MaxArch: CC_103
+          }
+          Items {
+            MinArch: CC_110
+            MaxArch: CC_110
+          }
+        }
+      }
+    Metrics {
+        Label: "Bytes Read for Global TMA Loads"
+        Name: "l1tex__m_xbar2l1tex_read_bytes_mem_global_op_tma_ld.sum"
+        Filter {
+          Items {
+            MinArch: CC_90
+            MaxArch: CC_90
+          }
+          Items {
+            MinArch: CC_100
+          }
+        }
+    }
+      Metrics {
+        Label: "Tensor Pipe (MMA instruction) Utilization"
+        Name: "sm__pipe_tensor_cycles_active.avg.pct_of_peak_sustained_elapsed"
+        Options {
+          Name: "sm__pipe_tensor_cycles_active_v2.avg.pct_of_peak_sustained_elapsed"
+          Filter {
+            MinArch: CC_89
+            MaxArch: CC_89
+          }
+        }
+      }
+    Metrics {
+        Label: "Bytes Written for Global TMA Stores"
+        Name: "l1tex__m_l1tex2xbar_write_bytes_mem_global_op_tma_st.sum"
+        Filter {
+            Items {
+                MinArch: CC_90
+                MaxArch: CC_90
+            }
+            Items {
+                MinArch: CC_100
+            }
+        }
+    }
+    Metrics {
+        Label: "Tensor Memory Accelerator (TMA) Pipe Utilization"
+        Name: "sm__pipe_tma_cycles_active.avg.pct_of_peak_sustained_elapsed"
+        Filter {
+            Items {
+                MinArch: CC_90
+                MaxArch: CC_90
+            }
+            Items {
+                MinArch: CC_100
+            }
+        }
+    }
+     Metrics {
+        Label: "Bytes Written for Global TMA Reductions"
+        Name: "l1tex__m_l1tex2xbar_write_bytes_mem_global_op_tma_red.sum"
+        Filter {
+            Items {
+                MinArch: CC_90
+                MaxArch: CC_90
+            }
+            Items {
+                MinArch: CC_100
+            }
+        }
+    }
+    }
+  }
+  Items {
+    HorizontalContainer {
+      Items {
+        BarChart {
+          Label: "Pipe Utilization (% of elapsed cycles)"
+          Description: "Pipeline utilization based on the number of elapsed cycles in the workload. This takes the rates of different instructions executing on the pipeline into account."
+          SortKey: ByValue
+          SortDirection: Descending
+          ValueAxis {
+            Label: "Utilization [%]"
+            Range {
+              Max: 100
+            }
+          }
+          ValueAxisAlignment: ValueAxisAlignments_Both
+          Metrics {
+            Label: "Tensor Core (TC)"
+            Name: "sm__pipe_tc_cycles_active.avg.pct_of_peak_sustained_elapsed"
+            Filter {
+              Items {
+                MinArch: CC_100
+                MaxArch: CC_100
+              }
+              Items {
+                MinArch: CC_103
+                MaxArch: CC_103
+              }
+              Items {
+                MinArch: CC_110
+                MaxArch: CC_110
+              }
+            }
+          }
+          Metrics {
+            Label: "Tensor Pipe (All)"
+            Name: "sm__pipe_tensor_cycles_active.avg.pct_of_peak_sustained_elapsed"
+            Options {
+              Name: "sm__pipe_tensor_cycles_active_v2.avg.pct_of_peak_sustained_elapsed"
+              Filter {
+                MinArch: CC_89
+                MaxArch: CC_89
+              }
+            }
+          }
+          Metrics {
+            Label: "Tensor Memory Accelerator (TMA)"
+            Name: "sm__pipe_tma_cycles_active.avg.pct_of_peak_sustained_elapsed"
+            Filter {
+              MinArch: CC_90
+            }
+          }
+        }
+      }
+      Items {
+        BarChart {
+          Label: "Pipe Utilization (% of active cycles)"
+          Description: "Pipeline utilization based on the number of cycles the pipeline was active. This takes the rates of different instructions executing on the pipeline into account."
+          SortKey: ByValue
+          SortDirection: Descending
+          ValueAxis {
+            Label: "Utilization [%]"
+            Range {
+              Max: 100
+            }
+          }
+          ValueAxisAlignment: ValueAxisAlignments_Both
+          Metrics {
+            Label: "Tensor Core (TC)"
+            Name: "sm__pipe_tc_cycles_active.avg.pct_of_peak_sustained_active"
+            Filter {
+              Items {
+                MinArch: CC_100
+                MaxArch: CC_100
+              }
+              Items {
+                MinArch: CC_103
+                MaxArch: CC_103
+              }
+              Items {
+                MinArch: CC_110
+                MaxArch: CC_110
+              }
+            }
+          }
+          Metrics {
+            Label: "Tensor Pipe (All)"
+            Name: "sm__pipe_tensor_cycles_active.avg.pct_of_peak_sustained_active"
+            Options {
+              Name: "sm__pipe_tensor_cycles_active_v2.avg.pct_of_peak_sustained_active"
+              Filter {
+                MinArch: CC_89
+                MaxArch: CC_89
+              }
+            }
+          }
+          Metrics {
+            Label: "Tensor Memory Accelerator (TMA)"
+            Name: "sm__pipe_tma_cycles_active.avg.pct_of_peak_sustained_active"
+            Filter {
+              MinArch: CC_90
+            }
+          }
+        }
+      }
+    }
+  }
+}
