@@ -22,49 +22,49 @@
 # OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-import NvRules
-from RequestedMetrics import Importance, MetricRequest, RequestedMetricsParser
-from TableBuilder import OpcodeTableBuilder
+import NvRules  # NvRules API for rule/runtime interactions
+from RequestedMetrics import Importance, MetricRequest, RequestedMetricsParser  # helpers to request metrics
+from TableBuilder import OpcodeTableBuilder  # helper to build opcode-based tables
 
 requested_metrics = [
     # This is currently collected in "SourceCounters" and "InstructionStatistics"
     # sections, warn if it is not available.
-    MetricRequest("inst_executed", None, Importance.OPTIONAL, None, True),
-    MetricRequest("sass__inst_executed_per_opcode", None, Importance.OPTIONAL, None, False),
+    MetricRequest("inst_executed", None, Importance.OPTIONAL, None, True),  # total executed instructions (optional)
+    MetricRequest("sass__inst_executed_per_opcode", None, Importance.OPTIONAL, None, False),  # per-opcode executed counts (optional)
 ]
 
 
 def get_identifier():
-    return "FPInstructions"
+    return "FPInstructions"  # unique rule identifier
 
 def get_name():
-    return "FP32/64 Instructions"
+    return "FP32/64 Instructions"  # human-friendly rule name
 
 def get_description():
-    return "Floating-point instruction analysis."
+    return "Floating-point instruction analysis."  # short description
 
 def get_section_identifier():
-    return "InstructionStats"
+    return "InstructionStats"  # UI section where results appear
 
 def get_parent_rules_identifiers():
-    return ["HighPipeUtilization"]
+    return ["HighPipeUtilization"]  # parent rule for weighting
 
 def get_estimated_speedup(pipeline_utilization_pct, fused_instructions, non_fused_instructions):
     # To calculate the speedup, assume we can convert non-fused to fused instructions,
     # which have double the throughput.
     # To get a global estimate weigh this with the FP pipeline utilization
     # (in terms of active cycles).
-    all_instructions = non_fused_instructions + fused_instructions
-    improvement_local = 0.5 * (non_fused_instructions / all_instructions)
+    all_instructions = non_fused_instructions + fused_instructions  # total FP-related instructions
+    improvement_local = 0.5 * (non_fused_instructions / all_instructions)  # local relative improvement if all non-fused were fused
 
     if pipeline_utilization_pct is not None:
-        speedup_type = NvRules.IFrontend.SpeedupType_GLOBAL
-        improvement_percent = improvement_local * pipeline_utilization_pct
+        speedup_type = NvRules.IFrontend.SpeedupType_GLOBAL  # report global speedup when we can weight it
+        improvement_percent = improvement_local * pipeline_utilization_pct  # weight local improvement by utilization
     else:
-        speedup_type = NvRules.IFrontend.SpeedupType_LOCAL
-        improvement_percent = improvement_local * 100
+        speedup_type = NvRules.IFrontend.SpeedupType_LOCAL  # fallback to local estimate
+        improvement_percent = improvement_local * 100  # express as percent
 
-    return speedup_type, improvement_percent
+    return speedup_type, improvement_percent  # return type and estimated percent
 
 
 def add_non_fused_instructions_table_and_source_markers(
@@ -75,37 +75,37 @@ def add_non_fused_instructions_table_and_source_markers(
         fp_type,
 ):
     if metrics["inst_executed"] is None:
-        return
+        return  # nothing to do if instruction count missing
 
     non_fused_opcodes = {
-        32: ["FADD", "FMUL"],
-        64: ["DADD", "DMUL"],
+        32: ["FADD", "FMUL"],  # opcodes considered non-fused for FP32
+        64: ["DADD", "DMUL"],  # opcodes considered non-fused for FP64
     }
 
     table_builder = OpcodeTableBuilder(
-        workload=action,
-        instruction_metric=metrics["inst_executed"],
-        opcodes=non_fused_opcodes[fp_type],
+        workload=action,  # action/workload context
+        instruction_metric=metrics["inst_executed"],  # metric used to correlate source lines
+        opcodes=non_fused_opcodes[fp_type],  # opcodes of interest for this precision
     )
     header, data, config = table_builder.build(
-        title=f"Most frequently executed non-fused FP{fp_type} instructions",
+        title=f"Most frequently executed non-fused FP{fp_type} instructions",  # table title
         description=(
             "Source lines with the highest number of executed"
             f" non-fused {fp_type}-bit floating point instructions."
-        ),
+        ),  # table description
     )
 
     if len(data) == 0:
-        return
+        return  # no rows to report
 
-    frontend.generate_table(message_id, header, data, config)
+    frontend.generate_table(message_id, header, data, config)  # emit the table to the frontend
 
     source_marker_advice = (
         "This line executes many non-fused floating-point instructions."
         " To improve performance, consider converting pairs of non-fused"
         " instructions to FMA instructions, and to enable NVCC's --use_fast_math"
         " or --fmad=true compiler flags."
-    )
+    )  # actionable advice for source markers
     for aggregate in table_builder.get_aggregates():
         frontend.source_marker(
             source_marker_advice,
@@ -117,9 +117,9 @@ def add_non_fused_instructions_table_and_source_markers(
 
 
 def apply(handle):
-    ctx = NvRules.get_context(handle)
-    action = ctx.range_by_idx(0).action_by_idx(0)
-    fe = ctx.frontend()
+    ctx = NvRules.get_context(handle)  # get the NvRules context
+    action = ctx.range_by_idx(0).action_by_idx(0)  # get the current action (workload)
+    fe = ctx.frontend()  # frontend interface
 
     metrics = RequestedMetricsParser(handle, action).parse(requested_metrics)
     if any(metric is None for metric in metrics.values()):
