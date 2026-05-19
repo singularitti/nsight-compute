@@ -28,6 +28,10 @@ Metrics {
     Label: "Instructions Executed"
     Name: "inst_executed"
   }
+  Metrics {
+    Label: "Predicated-On Thread Instructions Executed"
+    Name: "thread_inst_executed_true"
+  }
 }
 Header {
   Metrics {
@@ -56,39 +60,55 @@ Header {
   }
 }
 Body {
-  DisplayName: "Opcode Category Chart"
+  DisplayName: "Category and Pipeline Charts (Warp-Level)"
   SetDefault: true
-  Items {
-      BarChart {
-        Label: "Executed Instruction Categories"
-        CategoryAxis {
-          Label: "Opcode Categories"
-        }
-        ValueAxis {
-          Label: "Executed Warp-Level Instructions/Opcode"
-        }
-        ValueAxisAlignment: ValueAxisAlignments_Both
-        Metrics {
-          Label: "Executed Instructions by SASS Opcode Category"
-          Name: "sass__inst_executed_per_opcode_category"
-          ShowInstances: 1
-        }
-      }
-      Filter {
-        CollectionFilter {
-          CollectionScopes: CollectionScope_Launch
-          CollectionScopes: CollectionScope_Cmdlist
-        }
-      }
-  }
-}
-Body {
-  DisplayName: "Opcode Charts"
   Items {
     HorizontalContainer {
       Items {
         BarChart {
-          Label: "Executed Instruction Mix"
+          Label: "Executed Instruction Categories (Warp-Level)"
+          CategoryAxis {
+            Label: "Opcode Categories"
+          }
+          ValueAxis {
+            Label: "Executed Warp-Level Instructions/Opcode"
+          }
+          ValueAxisAlignment: ValueAxisAlignments_Both
+          Metrics {
+            Label: "Executed Instructions by SASS Opcode Category"
+            Name: "sass__inst_executed_per_opcode_category"
+            ShowInstances: 1
+          }
+        }
+      }
+      Items {
+        BarChart {
+          Label: "Estimated Instructions per Pipeline (Warp-Level)"
+          Description: "Estimated distribution of executed instructions across pipelines based on opcode. This is an estimation, as some opcodes have multiple associated possible pipelines. This may not reflect the actual dynamic hardware execution."
+          CategoryAxis {
+            Label: "Opcode Pipelines"
+          }
+          ValueAxis {
+            Label: "Estimated Warp-Level Instructions/Pipeline"
+          }
+          ValueAxisAlignment: ValueAxisAlignments_Both
+          Metrics {
+            Label: "Estimated Instructions by SASS Opcode Pipeline"
+            Name: "sass__inst_executed_per_opcode_pipeline"
+            ShowInstances: 1
+          }
+        }
+      }
+    }
+  }
+}
+Body {
+  DisplayName: "Detailed Opcode Charts (Warp-Level)"
+  Items {
+    HorizontalContainer {
+      Items {
+        BarChart {
+          Label: "Executed Instruction Mix (Warp-Level)"
           CategoryAxis {
             Label: "Opcodes"
           }
@@ -99,6 +119,73 @@ Body {
           Metrics {
             Label: "Executed Warp-Level Instructions By Basic SASS Opcode"
             Name: "sass__inst_executed_per_opcode"
+            ShowInstances: 1
+          }
+        }
+      }
+    }
+  }
+}
+
+Body {
+  DisplayName: "Category and Pipeline Charts (Thread-Level)"
+  Items {
+    HorizontalContainer {
+      Items {
+        BarChart {
+          Label: "Executed Instruction Categories (Thread-Level)"
+          CategoryAxis {
+            Label: "Opcode Categories"
+          }
+          ValueAxis {
+            Label: "Executed Thread-Level Instructions/Opcode"
+          }
+          ValueAxisAlignment: ValueAxisAlignments_Both
+          Metrics {
+            Label: "Executed Instructions by SASS Opcode Category"
+            Name: "sass__thread_inst_executed_per_opcode_category"
+            ShowInstances: 1
+          }
+        }
+      }
+      Items {
+        BarChart {
+          Label: "Estimated Instructions per Pipeline (Thread-Level)"
+          Description: "Estimated distribution of executed instructions across pipelines based on opcode. This is an estimation, as some opcodes have multiple associated possible pipelines. This may not reflect the actual dynamic hardware execution."
+          CategoryAxis {
+            Label: "Opcode Pipelines"
+          }
+          ValueAxis {
+            Label: "Estimated Thread-Level Instructions/Pipeline"
+          }
+          ValueAxisAlignment: ValueAxisAlignments_Both
+          Metrics {
+            Label: "Estimated Instructions by SASS Opcode Pipeline"
+            Name: "sass__thread_inst_executed_per_opcode_pipeline"
+            ShowInstances: 1
+          }
+        }
+      }
+    }
+  }
+}
+Body {
+  DisplayName: "Detailed Opcode Charts (Thread-Level)"
+  Items {
+    HorizontalContainer {
+      Items {
+        BarChart {
+          Label: "Executed Instruction Mix (Thread-Level)"
+          CategoryAxis {
+            Label: "Opcodes"
+          }
+          ValueAxis {
+            Label: "Executed Thread-Level Instructions/Opcode"
+          }
+          ValueAxisAlignment: ValueAxisAlignments_Both
+          Metrics {
+            Label: "Executed Thread-Level Instructions By Basic SASS Opcode"
+            Name: "sass__thread_inst_executed_true_per_opcode"
             ShowInstances: 1
           }
         }

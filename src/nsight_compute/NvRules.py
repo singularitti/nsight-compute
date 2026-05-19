@@ -1347,6 +1347,25 @@ MsgType_OK = _NvRules.MsgType_OK
 MsgType_OPTIMIZATION = _NvRules.MsgType_OPTIMIZATION
 MsgType_WARNING = _NvRules.MsgType_WARNING
 MsgType_ERR = _NvRules.MsgType_ERR
+StallReason_INVALID = _NvRules.StallReason_INVALID
+StallReason_BARRIER = _NvRules.StallReason_BARRIER
+StallReason_BRANCH_RESOLVING = _NvRules.StallReason_BRANCH_RESOLVING
+StallReason_DISPATCH_STALL = _NvRules.StallReason_DISPATCH_STALL
+StallReason_DRAIN = _NvRules.StallReason_DRAIN
+StallReason_IMC_MISS = _NvRules.StallReason_IMC_MISS
+StallReason_LG_THROTTLE = _NvRules.StallReason_LG_THROTTLE
+StallReason_LONG_SCOREBOARD = _NvRules.StallReason_LONG_SCOREBOARD
+StallReason_MIO_THROTTLE = _NvRules.StallReason_MIO_THROTTLE
+StallReason_MATH_PIPE_THROTTLE = _NvRules.StallReason_MATH_PIPE_THROTTLE
+StallReason_MEMBAR = _NvRules.StallReason_MEMBAR
+StallReason_MISC = _NvRules.StallReason_MISC
+StallReason_NO_INSTRUCTIONS = _NvRules.StallReason_NO_INSTRUCTIONS
+StallReason_NOT_SELECTED = _NvRules.StallReason_NOT_SELECTED
+StallReason_SELECTED = _NvRules.StallReason_SELECTED
+StallReason_SHORT_SCOREBOARD = _NvRules.StallReason_SHORT_SCOREBOARD
+StallReason_SLEEPING = _NvRules.StallReason_SLEEPING
+StallReason_TEX_THROTTLE = _NvRules.StallReason_TEX_THROTTLE
+StallReason_WAIT = _NvRules.StallReason_WAIT
 class RuleResultMessage(object):
     thisown = property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc="The membership flag")
     __repr__ = _swig_repr
@@ -1393,6 +1412,20 @@ class SourceMarker(object):
 
 # Register SourceMarker in _NvRules:
 _NvRules.SourceMarker_swigregister(SourceMarker)
+class TimedWarpSample(object):
+    thisown = property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc="The membership flag")
+    __repr__ = _swig_repr
+    __swig_destroy__ = _NvRules.delete_TimedWarpSample
+    timestamp = property(_NvRules.TimedWarpSample_timestamp_get, _NvRules.TimedWarpSample_timestamp_set)
+    pc = property(_NvRules.TimedWarpSample_pc_get, _NvRules.TimedWarpSample_pc_set)
+    stall_reason = property(_NvRules.TimedWarpSample_stall_reason_get, _NvRules.TimedWarpSample_stall_reason_set)
+    not_issued = property(_NvRules.TimedWarpSample_not_issued_get, _NvRules.TimedWarpSample_not_issued_set)
+
+    def __init__(self, *args):
+        _NvRules.TimedWarpSample_swiginit(self, _NvRules.new_TimedWarpSample(*args))
+
+# Register TimedWarpSample in _NvRules:
+_NvRules.TimedWarpSample_swigregister(TimedWarpSample)
 class IRuleResult(object):
     thisown = property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc="The membership flag")
 
@@ -1542,6 +1575,9 @@ class IMetric(object):
 
         """
         return _NvRules.IMetric_name(self)
+
+    def label(self):
+        return _NvRules.IMetric_label(self)
 
     def metric_type(self):
         r"""
@@ -2116,6 +2152,40 @@ class INvtxState(object):
 
 # Register INvtxState in _NvRules:
 _NvRules.INvtxState_swigregister(INvtxState)
+class ISection(object):
+    thisown = property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc="The membership flag")
+
+    def __init__(self, *args, **kwargs):
+        raise AttributeError("No constructor defined - class is abstract")
+    __repr__ = _swig_repr
+    __swig_destroy__ = _NvRules.delete_ISection
+
+    def identifier(self):
+        return _NvRules.ISection_identifier(self)
+
+    def description(self):
+        return _NvRules.ISection_description(self)
+
+    def name(self):
+        return _NvRules.ISection_name(self)
+
+    def parent_identifier(self):
+        return _NvRules.ISection_parent_identifier(self)
+
+    def order(self):
+        return _NvRules.ISection_order(self)
+
+    def header_metrics(self):
+        return _NvRules.ISection_header_metrics(self)
+
+    def body_metrics(self):
+        return _NvRules.ISection_body_metrics(self)
+
+    def rules(self):
+        return _NvRules.ISection_rules(self)
+
+# Register ISection in _NvRules:
+_NvRules.ISection_swigregister(ISection)
 class IAction(object):
     r"""
 
@@ -2250,6 +2320,9 @@ class IAction(object):
         """
         return _NvRules.IAction_source_files(self)
 
+    def sections(self):
+        return _NvRules.IAction_sections(self)
+
     def sass_by_pc(self, address):
         r"""
 
@@ -2297,6 +2370,9 @@ class IAction(object):
 
     def rule_results(self):
         return _NvRules.IAction_rule_results(self)
+
+    def timed_warp_samples(self):
+        return _NvRules.IAction_timed_warp_samples(self)
 
     def __str__(self):
         """Get a human-readable representation of this :class:`IAction`.
@@ -2741,6 +2817,19 @@ class IFrontend(object):
 
 # Register IFrontend in _NvRules:
 _NvRules.IFrontend_swigregister(IFrontend)
+class IBackend(object):
+    thisown = property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc="The membership flag")
+
+    def __init__(self, *args, **kwargs):
+        raise AttributeError("No constructor defined - class is abstract")
+    __repr__ = _swig_repr
+    __swig_destroy__ = _NvRules.delete_IBackend
+
+    def get_opcodes(self, action, pipeline):
+        return _NvRules.IBackend_get_opcodes(self, action, pipeline)
+
+# Register IBackend in _NvRules:
+_NvRules.IBackend_swigregister(IBackend)
 class IBaseContext(object):
     thisown = property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc="The membership flag")
 
@@ -2929,6 +3018,9 @@ class IContext(IBaseContext):
 
         """
         return _NvRules.IContext_frontend(self)
+
+    def backend(self):
+        return _NvRules.IContext_backend(self)
 
     def num_ranges(self):
         r"""

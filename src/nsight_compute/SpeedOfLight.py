@@ -1,4 +1,4 @@
-# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
 # are met:
@@ -27,13 +27,13 @@ import math
 import NvRules
 from RequestedMetrics import Importance, MetricRequest, RequestedMetricsParser
 
-requested_metrics = [  # metrics driving the SOL (Speed of Light) analysis
-    MetricRequest("sm__throughput.avg.pct_of_peak_sustained_elapsed", "sm_sol_pct"),  # SM compute throughput % of peak
-    MetricRequest("gpu__compute_memory_throughput.avg.pct_of_peak_sustained_elapsed", "mem_sol_pct", Importance.OPTIONAL, None, False),  # memory throughput % (optional)
-    MetricRequest("breakdown:gpu__compute_memory_throughput.avg.pct_of_peak_sustained_elapsed", "breakdown_memory", Importance.OPTIONAL, None, False),  # memory breakdown metric (optional)
-    MetricRequest("launch__waves_per_multiprocessor", "num_waves", Importance.OPTIONAL, None, False),  # waves per SM (optional)
-    MetricRequest("launch__uses_nvlink_centric_scheduling", "nvlink_scheduling", Importance.OPTIONAL, None, False),  # NVLink scheduling flag (optional)
-    MetricRequest("launch__uses_green_context", "is_green_context", Importance.OPTIONAL, False, False),  # green context flag (optional)
+requested_metrics = [
+    MetricRequest("sm__throughput.avg.pct_of_peak_sustained_elapsed", "sm_sol_pct"),
+    MetricRequest("gpu__compute_memory_throughput.avg.pct_of_peak_sustained_elapsed", "mem_sol_pct", Importance.OPTIONAL, None, False),
+    MetricRequest("breakdown:gpu__compute_memory_throughput.avg.pct_of_peak_sustained_elapsed", "breakdown_memory", Importance.OPTIONAL, None, False),
+    MetricRequest("launch__waves_per_multiprocessor", "num_waves", Importance.OPTIONAL, None, False),
+    MetricRequest("launch__uses_nvlink_centric_scheduling", "nvlink_scheduling", Importance.OPTIONAL, None, False),
+    MetricRequest("launch__uses_green_context", "is_green_context", Importance.OPTIONAL, False, False),
 ]
 
 
@@ -50,14 +50,14 @@ def get_section_identifier():
     return "SpeedOfLight"
 
 def get_max_pipe(breakdown_metrics):
-    max_pipe = None  # name of the metric with maximum value
-    max_pipe_value = 0  # value of the max metric
+    max_pipe = None
+    max_pipe_value = 0
 
     for name, metric in breakdown_metrics.items():
-        pipe_value = metric.value()  # get numeric value
+        pipe_value = metric.value()
         if pipe_value > max_pipe_value:
-            max_pipe_value = pipe_value  # update best value
-            max_pipe = name  # update best metric name
+            max_pipe_value = pipe_value
+            max_pipe = name
 
     if max_pipe:
         tokens = {
@@ -67,92 +67,91 @@ def get_max_pipe(breakdown_metrics):
             "ltc" : "L2",
             "fbp" : "DRAM",
             "fbpa" : "DRAM"
-        }  # mapping token prefixes to human-readable names
+        }
 
         for token in tokens:
             if max_pipe.startswith(token):
-                return tokens[token]  # return friendly name when a prefix matches
+                return tokens[token]
 
-    return None  # no matching token found
+    return None
 
 
 def get_breakdown_metrics(parser, breakdown_metric):
-    requests = []  # build MetricRequest list from comma-separated breakdown metric
+    requests = []
     for metric_name in breakdown_metric.value().split(","):
-        request = MetricRequest(metric_name)  # create a request per token
+        request = MetricRequest(metric_name)
         requests.append(request)
-    return parser.parse(requests)  # parse and return metric objects
+    return parser.parse(requests)
 
 
 def apply(handle):
-    ctx = NvRules.get_context(handle)  # get NvRules context
-    action = ctx.range_by_idx(0).action_by_idx(0)  # current action/workload
-    fe = ctx.frontend()  # frontend helper
+    ctx = NvRules.get_context(handle)
+    action = ctx.range_by_idx(0).action_by_idx(0)
+    fe = ctx.frontend()
 
     parser = RequestedMetricsParser(handle, action)
-    metrics = parser.parse(requested_metrics)  # request SOL-related metrics
+    metrics = parser.parse(requested_metrics)
 
-    sm_sol_pct_metric = metrics["sm_sol_pct"]  # compute throughput metric object
-    mem_sol_pct_metric = metrics["mem_sol_pct"]  # memory throughput metric object (may be optional)
-    breakdown_memory_metric = metrics["breakdown_memory"]  # memory breakdown spec (optional)
+    sm_sol_pct_metric = metrics["sm_sol_pct"]
+    mem_sol_pct_metric = metrics["mem_sol_pct"]
+    breakdown_memory_metric = metrics["breakdown_memory"]
 
     if mem_sol_pct_metric is None or breakdown_memory_metric is None:
-        return  # cannot proceed without memory metrics
+        return
 
-    breakdown_metrics_memory = get_breakdown_metrics(parser, breakdown_memory_metric)  # parse breakdown metrics
+    breakdown_metrics_memory = get_breakdown_metrics(parser, breakdown_memory_metric)
 
-    sm_sol_pct_name = sm_sol_pct_metric.name()  # metric name for reporting
+    sm_sol_pct_name = sm_sol_pct_metric.name()
     mem_sol_pct_name = mem_sol_pct_metric.name()
 
-    sm_sol_pct = sm_sol_pct_metric.value()  # achieved compute throughput % of peak
-    mem_sol_pct = mem_sol_pct_metric.value()  # achieved memory throughput % of peak
+    sm_sol_pct = sm_sol_pct_metric.value()
+    mem_sol_pct = mem_sol_pct_metric.value()
 
-    balanced_threshold = 10  # % threshold to call one side heavier
-    latency_bound_threshold = 60  # % threshold below which we suspect latency
-    no_bound_threshold = 80  # % threshold above which we say high throughput
-    waves_threshold = 1  # threshold for small-grid detection
+    balanced_threshold = 10
+    latency_bound_threshold = 60
+    no_bound_threshold = 80
+    waves_threshold = 1
 
-    msg_type = NvRules.MsgType.OK  # default message type
+    msg_type = NvRules.MsgType.OK
     resource_partition = "device"
     if metrics["is_green_context"].value():
-        resource_partition = "green context"  # adjust messaging when profiling green contexts
+        resource_partition = "green context"
 
-    focus_metrics = []  # list of (name, value, severity, hint)
+    focus_metrics = []
 
     if sm_sol_pct >= mem_sol_pct:
-        bottleneck_section = "@section:ComputeWorkloadAnalysis:Compute Workload Analysis@"  # compute-focused guidance
+        bottleneck_section = "@section:ComputeWorkloadAnalysis:Compute Workload Analysis@"
     else:
-        bottleneck_section = "@section:MemoryWorkloadAnalysis:Memory Workload Analysis@"  # memory-focused guidance
+        bottleneck_section = "@section:MemoryWorkloadAnalysis:Memory Workload Analysis@"
 
     if sm_sol_pct < no_bound_threshold and mem_sol_pct < no_bound_threshold:
-        # Neither compute nor memory are near peak: could be latency or underutilization
         if sm_sol_pct < latency_bound_threshold and mem_sol_pct < latency_bound_threshold:
-            msg_type = NvRules.MsgType.OPTIMIZATION  # suggest optimization actions
-            num_waves_metric = metrics["num_waves"]  # check waves per SM
+            msg_type = NvRules.MsgType.OPTIMIZATION
+            num_waves_metric = metrics["num_waves"]
             if num_waves_metric and num_waves_metric.value() < waves_threshold:
                 num_waves = num_waves_metric.value()
-                focus_metrics.append((num_waves_metric.name(), num_waves, NvRules.IFrontend.Severity_SEVERITY_HIGH, "Increase the number of waves per SM towards {}".format(waves_threshold)))  # advise increasing waves
+                focus_metrics.append((num_waves_metric.name(), num_waves, NvRules.IFrontend.Severity_SEVERITY_HIGH, "Increase the number of waves per SM towards {}".format(waves_threshold)))
                 if action.workload_type() == NvRules.IAction.WorkloadType_KERNEL:
-                    message = "This kernel grid is too small to fill the available resources on this {}, resulting in only {:.2f} full waves across all SMs.".format(resource_partition, num_waves)  # kernel-specific message
+                    message = "This kernel grid is too small to fill the available resources on this {}, resulting in only {:.2f} full waves across all SMs.".format(resource_partition, num_waves)
                 else:
                     # The aggregate value of num_waves is the max over all launches
-                    message = "All launches of this workload use grids that are too small to fill the available resources on this {}, resulting in at most {:.2f} full waves across all SMs.".format(resource_partition, num_waves)  # workload-wide message
+                    message = "All launches of this workload use grids that are too small to fill the available resources on this {}, resulting in at most {:.2f} full waves across all SMs.".format(resource_partition, num_waves)
                 message += " Look at @section:LaunchStats:Launch Statistics@ for more details."
                 name = "Small Grid"
             else:
-                focus_metrics.append((sm_sol_pct_name, sm_sol_pct, NvRules.IFrontend.Severity_SEVERITY_HIGH, "{:.3f} < {:.3f}".format(sm_sol_pct, no_bound_threshold)))  # point to compute metric
-                focus_metrics.append((mem_sol_pct_name, mem_sol_pct, NvRules.IFrontend.Severity_SEVERITY_HIGH, "{:.3f} < {:.3f}".format(mem_sol_pct, no_bound_threshold)))  # point to memory metric
+                focus_metrics.append((sm_sol_pct_name, sm_sol_pct, NvRules.IFrontend.Severity_SEVERITY_HIGH, "{:.3f} < {:.3f}".format(sm_sol_pct, no_bound_threshold)))
+                focus_metrics.append((mem_sol_pct_name, mem_sol_pct, NvRules.IFrontend.Severity_SEVERITY_HIGH, "{:.3f} < {:.3f}".format(mem_sol_pct, no_bound_threshold)))
                 message = "This workload exhibits low compute throughput and memory bandwidth utilization relative to the peak performance of this {}. Achieved compute throughput and/or memory bandwidth below {:.1f}% of peak typically indicate latency issues. Look at @section:SchedulerStats:Scheduler Statistics@ and @section:WarpStateStats:Warp State Statistics@ for potential reasons.".format(resource_partition, latency_bound_threshold)
                 name = "Latency Issue"
         elif math.fabs(sm_sol_pct - mem_sol_pct) >= balanced_threshold:
-            msg_type = NvRules.MsgType.OPTIMIZATION  # suggest optimization when one side dominates
+            msg_type = NvRules.MsgType.OPTIMIZATION
             if sm_sol_pct > mem_sol_pct:
-                focus_metrics.append((sm_sol_pct_name, mem_sol_pct, NvRules.IFrontend.Severity_SEVERITY_LOW, "{:.3f} - {:.3f} >= {:.3f}".format(sm_sol_pct, mem_sol_pct, balanced_threshold)))  # compute dominated
+                focus_metrics.append((sm_sol_pct_name, mem_sol_pct, NvRules.IFrontend.Severity_SEVERITY_LOW, "{:.3f} - {:.3f} >= {:.3f}".format(sm_sol_pct, mem_sol_pct, balanced_threshold)))
                 message = "Compute is more heavily utilized than Memory: Look at the {} section to see what the compute pipelines are spending their time doing. Also, consider whether any computation is redundant and could be reduced or moved to look-up tables.".format(bottleneck_section)
                 name = "High Compute Throughput"
             else:
-                focus_metrics.append((mem_sol_pct_name, mem_sol_pct, NvRules.IFrontend.Severity_SEVERITY_LOW, "{:.3f} - {:.3f} >= {:.3f}".format(mem_sol_pct, sm_sol_pct, balanced_threshold)))  # memory dominated
-                pipe_name = get_max_pipe(breakdown_metrics_memory)  # best guess which memory pipe is hot
+                focus_metrics.append((mem_sol_pct_name, mem_sol_pct, NvRules.IFrontend.Severity_SEVERITY_LOW, "{:.3f} - {:.3f} >= {:.3f}".format(mem_sol_pct, sm_sol_pct, balanced_threshold)))
+                pipe_name = get_max_pipe(breakdown_metrics_memory)
                 pipe_msg = "to identify the {} bottleneck".format(pipe_name) if pipe_name else "to see where the memory system bottleneck is"
                 message = "Memory is more heavily utilized than Compute: Look at the {} section {}. Check memory replay (coalescing) metrics to make sure you're efficiently utilizing the bytes transferred. Also consider whether it is possible to do more work per memory access (kernel fusion) or whether there are values you can (re)compute.".format(bottleneck_section, pipe_msg)
                 name = "High Memory Throughput"
@@ -162,14 +161,14 @@ def apply(handle):
     else:
         pipe_name = None
         if mem_sol_pct > sm_sol_pct:
-            pipe_name = get_max_pipe(breakdown_metrics_memory)  # identify the memory pipe if memory is dominant
+            pipe_name = get_max_pipe(breakdown_metrics_memory)
         pipe_msg = pipe_name if pipe_name else "workloads"
         message = "This workload is utilizing greater than {:.1f}% of the available compute or memory performance of this {}. To further improve performance, work will likely need to be shifted from the most utilized to another unit. Start by analyzing {} in the {} section.".format(no_bound_threshold, resource_partition, pipe_msg, bottleneck_section)
         name = "High Throughput"
 
-    msg_id = fe.message(msg_type, message, name)  # emit the chosen message
+    msg_id = fe.message(msg_type, message, name)
     for focus_metric in focus_metrics:
-        fe.focus_metric(msg_id, focus_metric[0], focus_metric[1], focus_metric[2], focus_metric[3])  # attach focus metrics
+        fe.focus_metric(msg_id, focus_metric[0], focus_metric[1], focus_metric[2], focus_metric[3])
 
     if sm_sol_pct < no_bound_threshold:
         nvlink_scheduling_metric = metrics["nvlink_scheduling"]

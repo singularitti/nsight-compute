@@ -1,4 +1,4 @@
-# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
 # are met:
@@ -26,27 +26,27 @@ import NvRules
 from RequestedMetrics import Importance, MetricRequest, RequestedMetricsParser
 from TableBuilder import OpcodeTableBuilder
 
-requested_metrics = [  # metrics used to compute peak and achieved FP work
-    MetricRequest("device__attribute_compute_capability_major", "cc_major"),  # device CC major
-    MetricRequest("device__attribute_compute_capability_minor", "cc_minor"),  # device CC minor
+requested_metrics = [
+    MetricRequest("device__attribute_compute_capability_major", "cc_major"),
+    MetricRequest("device__attribute_compute_capability_minor", "cc_minor"),
     # This is currently collected in "SourceCounters" and "InstructionStatistics"
     # sections, do not warn if it is not available (as with the basic set).
-    MetricRequest("inst_executed", None, Importance.OPTIONAL, None, False),  # optional executed instruction counter
-    MetricRequest("sm__sass_thread_inst_executed_op_ffma_pred_on.sum.peak_sustained", "inst_executed_ffma_peak"),  # theoretical FFMA peak per-thread
-    MetricRequest("sm__sass_thread_inst_executed_op_dfma_pred_on.sum.peak_sustained", "inst_executed_dfma_peak"),  # theoretical DFMA peak per-thread
-    MetricRequest("smsp__sass_thread_inst_executed_op_fadd_pred_on.sum.per_cycle_elapsed", "inst_executed_fadd"),  # achieved FADD per-cycle
-    MetricRequest("smsp__sass_thread_inst_executed_op_fmul_pred_on.sum.per_cycle_elapsed", "inst_executed_fmul"),  # achieved FMUL per-cycle
-    MetricRequest("smsp__sass_thread_inst_executed_op_ffma_pred_on.sum.per_cycle_elapsed", "inst_executed_ffma"),  # achieved FFMA per-cycle
-    MetricRequest("smsp__sass_thread_inst_executed_op_dadd_pred_on.sum.per_cycle_elapsed", "inst_executed_dadd"),  # achieved DADD per-cycle
-    MetricRequest("smsp__sass_thread_inst_executed_op_dmul_pred_on.sum.per_cycle_elapsed", "inst_executed_dmul"),  # achieved DMUL per-cycle
-    MetricRequest("smsp__sass_thread_inst_executed_op_dfma_pred_on.sum.per_cycle_elapsed", "inst_executed_dfma"),  # achieved DFMA per-cycle
-    MetricRequest("launch__uses_green_context", "is_green_context", Importance.OPTIONAL, False, False),  # optional: green context flag
+    MetricRequest("inst_executed", None, Importance.OPTIONAL, None, False),
+    MetricRequest("sm__sass_thread_inst_executed_op_ffma_pred_on.sum.peak_sustained", "inst_executed_ffma_peak"),
+    MetricRequest("sm__sass_thread_inst_executed_op_dfma_pred_on.sum.peak_sustained", "inst_executed_dfma_peak"),
+    MetricRequest("smsp__sass_thread_inst_executed_op_fadd_pred_on.sum.per_cycle_elapsed", "inst_executed_fadd"),
+    MetricRequest("smsp__sass_thread_inst_executed_op_fmul_pred_on.sum.per_cycle_elapsed", "inst_executed_fmul"),
+    MetricRequest("smsp__sass_thread_inst_executed_op_ffma_pred_on.sum.per_cycle_elapsed", "inst_executed_ffma"),
+    MetricRequest("smsp__sass_thread_inst_executed_op_dadd_pred_on.sum.per_cycle_elapsed", "inst_executed_dadd"),
+    MetricRequest("smsp__sass_thread_inst_executed_op_dmul_pred_on.sum.per_cycle_elapsed", "inst_executed_dmul"),
+    MetricRequest("smsp__sass_thread_inst_executed_op_dfma_pred_on.sum.per_cycle_elapsed", "inst_executed_dfma"),
+    MetricRequest("launch__uses_green_context", "is_green_context", Importance.OPTIONAL, False, False),
 ]
 
-requested_metrics_gb10x = [  # extra metrics for GB10x arch variants
-    MetricRequest("smsp__sass_thread_inst_executed_op_fadd2_pred_on.sum.per_cycle_elapsed", "inst_executed_fadd2"),  # FADD2 achieved per-cycle
-    MetricRequest("smsp__sass_thread_inst_executed_op_fmul2_pred_on.sum.per_cycle_elapsed", "inst_executed_fmul2"),  # FMUL2 achieved per-cycle
-    MetricRequest("smsp__sass_thread_inst_executed_op_ffma2_pred_on.sum.per_cycle_elapsed", "inst_executed_ffma2"),  # FFMA2 achieved per-cycle
+requested_metrics_gb10x = [
+    MetricRequest("smsp__sass_thread_inst_executed_op_fadd2_pred_on.sum.per_cycle_elapsed", "inst_executed_fadd2"),
+    MetricRequest("smsp__sass_thread_inst_executed_op_fmul2_pred_on.sum.per_cycle_elapsed", "inst_executed_fmul2"),
+    MetricRequest("smsp__sass_thread_inst_executed_op_ffma2_pred_on.sum.per_cycle_elapsed", "inst_executed_ffma2"),
 ]
 
 
@@ -66,23 +66,25 @@ def get_parent_rules_identifiers():
     return ["HighPipeUtilization"]
 
 def get_estimated_speedup(parent_weights, achieved_fp32, achieved_fp64, peak_fp32, peak_fp64):
-    # Estimate the speedup achievable by replacing FP64 with FP32 where possible.
-    # If peak FP64 per-thread exceeds FP32, no improvement is possible.
+    # Estimate the speedup as the 64-bit portion of the compute workload, assuming
+    # 32-bit FP pipeline has a higher throughput as 64-bit FP pipeline.
+    # To get a global estimate weigh this with the 64-bit FP pipeline utilization
+    # (in terms of active cycles).
     if peak_fp64 / peak_fp32 > 1:
-        return NvRules.IFrontend.SpeedupType_LOCAL, 0  # no local improvement
+        return NvRules.IFrontend.SpeedupType_LOCAL, 0
 
     improvement_local = (achieved_fp64 / (achieved_fp32 + achieved_fp64)) * (
         1 - peak_fp64 / peak_fp32
-    )  # fraction of workload that's FP64 * relative peak difference
+    )
 
     if "fp64_pipeline_utilization_pct" in parent_weights:
-        speedup_type = NvRules.IFrontend.SpeedupType_GLOBAL  # weighted global estimate
-        improvement_percent = improvement_local * parent_weights["fp64_pipeline_utilization_pct"]  # apply utilization weight
+        speedup_type = NvRules.IFrontend.SpeedupType_GLOBAL
+        improvement_percent = improvement_local * parent_weights["fp64_pipeline_utilization_pct"]
     else:
-        speedup_type = NvRules.IFrontend.SpeedupType_LOCAL  # local-only estimate
-        improvement_percent = improvement_local * 100  # convert to percent
+        speedup_type = NvRules.IFrontend.SpeedupType_LOCAL
+        improvement_percent = improvement_local * 100
 
-    return speedup_type, improvement_percent  # return type and estimated percent
+    return speedup_type, improvement_percent
 
 
 def add_fp64_instructions_table_and_source_markers(
@@ -92,107 +94,107 @@ def add_fp64_instructions_table_and_source_markers(
     metrics,
 ):
     if metrics["inst_executed"] is None:
-        return  # nothing to correlate to source if inst_executed missing
+        return
 
     table_builder = OpcodeTableBuilder(
-        workload=action,  # workload context
-        instruction_metric=metrics["inst_executed"],  # instruction metric to correlate
-        opcodes=["DADD", "DMUL", "DFMA"],  # FP64 opcodes of interest
+        workload=action,
+        instruction_metric=metrics["inst_executed"],
+        opcodes=["DADD", "DMUL", "DFMA"],
     )
     header, data, config = table_builder.build(
-        title="Most frequently executed FP64 instructions",  # table title
+        title="Most frequently executed FP64 instructions",
         description=(
             "Source lines with the highest number of executed"
             " 64-bit floating point instructions."
-        ),  # table description
+        ),
     )
 
     if len(data) == 0:
-        return  # nothing to display
+        return
 
-    frontend.generate_table(message_id, header, data, config)  # emit table to frontend
+    frontend.generate_table(message_id, header, data, config)
 
     source_marker_advice = (
         "This line executes many 64-bit floating-point instructions."
         " Consider converting them to their 32-bit equivalents"
         " to improve performance."
-    )  # advice for source markers
+    )
     for aggregate in table_builder.get_aggregates():
         frontend.source_marker(
-            source_marker_advice,  # advice text
-            aggregate.source_location.line,  # source line number
-            NvRules.MarkerKind.SOURCE,  # marker kind
-            aggregate.source_location.path,  # file path
-            NvRules.MsgType.OPTIMIZATION,  # message type
+            source_marker_advice,
+            aggregate.source_location.line,
+            NvRules.MarkerKind.SOURCE,
+            aggregate.source_location.path,
+            NvRules.MsgType.OPTIMIZATION,
         )
 
 
 def apply(handle):
-    ctx = NvRules.get_context(handle)  # NvRules context
-    action = ctx.range_by_idx(0).action_by_idx(0)  # current action/workload
-    fe = ctx.frontend()  # frontend helpers
-    metrics = RequestedMetricsParser(handle, action).parse(requested_metrics)  # retrieve needed metrics
-    parent_weights = fe.receive_dict_from_parent("HighPipeUtilization")  # weights sent by parent rule
+    ctx = NvRules.get_context(handle)
+    action = ctx.range_by_idx(0).action_by_idx(0)
+    fe = ctx.frontend()
+    metrics = RequestedMetricsParser(handle, action).parse(requested_metrics)
+    parent_weights = fe.receive_dict_from_parent("HighPipeUtilization")
 
-    peak_fp32 = 2 * metrics["inst_executed_ffma_peak"].value()  # FP32 peak: 2 ops per FFMA
-    peak_fp64 = 2 * metrics["inst_executed_dfma_peak"].value()  # FP64 peak: 2 ops per DFMA
+    peak_fp32 = 2 * metrics["inst_executed_ffma_peak"].value()
+    peak_fp64 = 2 * metrics["inst_executed_dfma_peak"].value()
 
-    fp32_add_achieved = metrics["inst_executed_fadd"].value()  # achieved FADD per-cycle
-    fp32_mul_achieved = metrics["inst_executed_fmul"].value()  # achieved FMUL per-cycle
-    fp32_fma_achieved = metrics["inst_executed_ffma"].value()  # achieved FFMA per-cycle
-    achieved_fp32 = fp32_add_achieved + fp32_mul_achieved + 2 * fp32_fma_achieved  # total achieved FP32 ops per-cycle
+    fp32_add_achieved = metrics["inst_executed_fadd"].value()
+    fp32_mul_achieved = metrics["inst_executed_fmul"].value()
+    fp32_fma_achieved = metrics["inst_executed_ffma"].value()
+    achieved_fp32 = fp32_add_achieved + fp32_mul_achieved + 2 * fp32_fma_achieved
 
-    cc_major = metrics["cc_major"].value()  # compute capability major
-    cc_minor = metrics["cc_minor"].value()  # compute capability minor
+    cc_major = metrics["cc_major"].value()
+    cc_minor = metrics["cc_minor"].value()
 
     if cc_major == 10 and (cc_minor == 0 or cc_minor == 3):
-        metrics_gb10x = RequestedMetricsParser(handle, action).parse(requested_metrics_gb10x)  # parse GB10x extras
-        fp32_add2_achieved = metrics_gb10x["inst_executed_fadd2"].value()  # achieved FADD2
-        fp32_mul2_achieved = metrics_gb10x["inst_executed_fmul2"].value()  # achieved FMUL2
-        fp32_fma2_achieved = metrics_gb10x["inst_executed_ffma2"].value()  # achieved FFMA2
-        achieved_fp32 += fp32_add2_achieved *2 + fp32_mul2_achieved + 2 * fp32_fma2_achieved * 4  # include multi-op contributions
+        metrics_gb10x = RequestedMetricsParser(handle, action).parse(requested_metrics_gb10x)
+        fp32_add2_achieved = metrics_gb10x["inst_executed_fadd2"].value()
+        fp32_mul2_achieved = metrics_gb10x["inst_executed_fmul2"].value()
+        fp32_fma2_achieved = metrics_gb10x["inst_executed_ffma2"].value()
+        achieved_fp32 += 2 * fp32_add2_achieved + 2 * fp32_mul2_achieved + 4 * fp32_fma2_achieved
 
-    fp64_add_achieved = metrics["inst_executed_dadd"].value()  # achieved DADD per-cycle
-    fp64_mul_achieved = metrics["inst_executed_dmul"].value()  # achieved DMUL per-cycle
-    fp64_fma_achieved = metrics["inst_executed_dfma"].value()  # achieved DFMA per-cycle
-    achieved_fp64 = fp64_add_achieved + fp64_mul_achieved + 2 * fp64_fma_achieved  # total achieved FP64 ops per-cycle
+    fp64_add_achieved = metrics["inst_executed_dadd"].value()
+    fp64_mul_achieved = metrics["inst_executed_dmul"].value()
+    fp64_fma_achieved = metrics["inst_executed_dfma"].value()
+    achieved_fp64 = fp64_add_achieved + fp64_mul_achieved + 2 * fp64_fma_achieved
 
-    high_utilization_threshold = 0.60  # thresholds used for messaging
+    high_utilization_threshold = 0.60
     low_utilization_threshold = 0.15
 
-    resource_partition = "device"  # descriptor used in messages
+    resource_partition = "device"
     if metrics["is_green_context"].value():
-        resource_partition = "green context"  # adjust descriptor if needed
+        resource_partition = "green context"
 
-    achieved_fp64_pct = achieved_fp64 / peak_fp64  # fraction of FP64 peak achieved
-    fp64_prefix = "" if achieved_fp64_pct >= 0.01 or achieved_fp64_pct == 0.0 else " close to "  # wording
-    achieved_fp32_pct = achieved_fp32 / peak_fp32  # fraction of FP32 peak achieved
-    fp32_prefix = "" if achieved_fp32_pct >= 0.01 or achieved_fp32_pct == 0.0 else " close to "  # wording
+    achieved_fp64_pct = achieved_fp64 / peak_fp64
+    fp64_prefix = "" if achieved_fp64_pct >= 0.01 or achieved_fp64_pct == 0.0 else " close to "
+    achieved_fp32_pct = achieved_fp32 / peak_fp32
+    fp32_prefix = "" if achieved_fp32_pct >= 0.01 or achieved_fp32_pct == 0.0 else " close to "
 
-    message = "The ratio of peak float (FP32) to double (FP64) performance on this device is {:.0f}:1.".format(peak_fp32 / peak_fp64)  # base summary
-    message += " The workload achieved {}{:.0f}% of this {}'s FP32 peak performance and {}{:.0f}% of its FP64 peak performance.".format(fp32_prefix, 100.0 * achieved_fp32_pct, resource_partition, fp64_prefix, 100.0 * achieved_fp64_pct)  # add stats
+    message = "The ratio of peak float (FP32) to double (FP64) performance on this device is {:.0f}:1.".format(peak_fp32 / peak_fp64)
+    message += " The workload achieved {}{:.0f}% of this {}'s FP32 peak performance and {}{:.0f}% of its FP64 peak performance.".format(fp32_prefix, 100.0 * achieved_fp32_pct, resource_partition, fp64_prefix, 100.0 * achieved_fp64_pct)
 
-    message_profiling_guide = " See the @url:Profiling Guide:https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#roofline@ for more details on roofline analysis."  # link to docs
+    message_profiling_guide = " See the @url:Profiling Guide:https://docs.nvidia.com/nsight-compute/ProfilingGuide/index.html#roofline@ for more details on roofline analysis."
 
     if achieved_fp32_pct < high_utilization_threshold and achieved_fp64_pct > low_utilization_threshold:
-        message += " If @section:ComputeWorkloadAnalysis:Compute Workload Analysis@ determines that this workload is FP64 bound, consider using 32-bit precision floating point operations to improve its performance."  # suggestion to lower precision
+        message += " If @section:ComputeWorkloadAnalysis:Compute Workload Analysis@ determines that this workload is FP64 bound, consider using 32-bit precision floating point operations to improve its performance."
         message += message_profiling_guide
-        msg_id = fe.message(NvRules.MsgType.OPTIMIZATION, message, "FP64/32 Utilization")  # emit optimization message
+        msg_id = fe.message(NvRules.MsgType.OPTIMIZATION, message, "FP64/32 Utilization")
 
-        speedup_type, speedup_value = get_estimated_speedup(parent_weights, achieved_fp32, achieved_fp64, peak_fp32, peak_fp64)  # compute estimated speedup
-        fe.speedup(msg_id, speedup_type, speedup_value)  # attach speedup
+        speedup_type, speedup_value = get_estimated_speedup(parent_weights, achieved_fp32, achieved_fp64, peak_fp32, peak_fp64)
+        fe.speedup(msg_id, speedup_type, speedup_value)
 
         if speedup_value > 0:
-            fe.focus_metric(msg_id, metrics["inst_executed_dadd"].name(), fp64_add_achieved, NvRules.IFrontend.Severity_SEVERITY_HIGH, "Decrease FP64 ADD instructions")  # focus on DADD
-            fe.focus_metric(msg_id, metrics["inst_executed_dmul"].name(), fp64_mul_achieved, NvRules.IFrontend.Severity_SEVERITY_HIGH, "Decrease FP64 MUL instructions")  # focus on DMUL
-            fe.focus_metric(msg_id, metrics["inst_executed_dfma"].name(), fp64_fma_achieved, NvRules.IFrontend.Severity_SEVERITY_HIGH, "Decrease FP64 FMA instructions")  # focus on DFMA
+            fe.focus_metric(msg_id, metrics["inst_executed_dadd"].name(), fp64_add_achieved, NvRules.IFrontend.Severity_SEVERITY_HIGH, "Decrease FP64 ADD instructions")
+            fe.focus_metric(msg_id, metrics["inst_executed_dmul"].name(), fp64_mul_achieved, NvRules.IFrontend.Severity_SEVERITY_HIGH, "Decrease FP64 MUL instructions")
+            fe.focus_metric(msg_id, metrics["inst_executed_dfma"].name(), fp64_fma_achieved, NvRules.IFrontend.Severity_SEVERITY_HIGH, "Decrease FP64 FMA instructions")
 
-        add_fp64_instructions_table_and_source_markers(msg_id, fe, action, metrics)  # emit table and markers
+        add_fp64_instructions_table_and_source_markers(msg_id, fe, action, metrics)
 
     elif achieved_fp64_pct > high_utilization_threshold and achieved_fp32_pct > high_utilization_threshold:
-        message += " If @section:SpeedOfLight:Speed Of Light@ analysis determines that this workload is compute bound, consider using integer arithmetic instead where applicable."  # generic suggestion
+        message += " If @section:SpeedOfLight:Speed Of Light@ analysis determines that this workload is compute bound, consider using integer arithmetic instead where applicable."
         message += message_profiling_guide
-        msg_id = fe.message(NvRules.MsgType.OPTIMIZATION, message, "High FP Utilization")  # optimization message
+        msg_id = fe.message(NvRules.MsgType.OPTIMIZATION, message, "High FP Utilization")
     else:
         message += message_profiling_guide
-        msg_id = fe.message(NvRules.MsgType.OK, message, "Roofline Analysis")  # OK status
+        msg_id = fe.message(NvRules.MsgType.OK, message, "Roofline Analysis")

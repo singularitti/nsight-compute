@@ -439,9 +439,7 @@ Body {
         Label: "Potential Cluster Size"
         Range {
           Min: 1
-          Max: 16
         }
-        TickCount: 16
         Precision: 0
       }
       AxisY {

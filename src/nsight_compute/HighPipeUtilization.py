@@ -1,4 +1,4 @@
-# Copyright (c) 2025, NVIDIA CORPORATION. All rights reserved.
+# Copyright (c) 2026, NVIDIA CORPORATION. All rights reserved.
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
 # are met:
@@ -30,6 +30,9 @@ requested_metrics = [
     MetricRequest("device__attribute_compute_capability_major", "cc_major"),
     MetricRequest("device__attribute_compute_capability_minor", "cc_minor"),
 
+    # This is currently collected in "SourceCounters" and "InstructionStatistics"
+    # sections, warn if it is not available.
+    MetricRequest("inst_executed", None, Importance.OPTIONAL, None, True),
 
     # Active cycles pipelines
     MetricRequest("sm__pipe_alu_cycles_active.avg.pct_of_peak_sustained_elapsed", None, Importance.OPTIONAL, None, False),
@@ -181,6 +184,52 @@ class SharedPipeline(CompositePipeline):
         return description
 
 
+def add_instructions_table_and_source_markers(
+    message_id,
+    frontend,
+    backend,
+    action,
+    metrics,
+    pipeline_name,
+):
+    if metrics["inst_executed"] is None:
+        return
+
+    # change e.g. 'TENSOR (INT)' to just 'TENSOR'
+    base_pipeline_name = pipeline_name.split()[0]
+
+    table_builder = PipelineTableBuilder(
+        workload=action,
+        instruction_metric=metrics["inst_executed"],
+        opcodes=backend.get_opcodes(action, base_pipeline_name),
+    )
+    header, data, config = table_builder.build(
+        title=f"Most frequently executed instructions for pipeline {base_pipeline_name}",
+        description="Source lines with the highest number of executed instructions"
+        f" on pipeline {pipeline_name}.",
+    )
+
+    if len(data) == 0:
+        return
+
+    frontend.generate_table(message_id, header, data, config)
+
+    for aggregate in table_builder.get_aggregates():
+        instructions = ", ".join(list(aggregate.opcodes)[:3])
+        source_marker_advice = (
+            f"This line executes many {instructions} instructions on {base_pipeline_name}"
+            " which is the highest utilized pipeline."
+            " To improve performance further, try to decrease the number"
+            " of instructions executed on this pipeline."
+        )
+
+        frontend.source_marker(
+            source_marker_advice,
+            aggregate.source_location.line,
+            NvRules.MarkerKind.SOURCE,
+            aggregate.source_location.path,
+            NvRules.MsgType.OPTIMIZATION,
+        )
 
 
 def apply(handle):
@@ -319,10 +368,11 @@ def apply(handle):
             if pipe_info is not None:
                 message += " It " + pipe_info + "."
 
+            msg_type = NvRules.MsgType.OPTIMIZATION
             if max_utilization_ac < high_utilization_threshold:
                 message_name = "Balanced"
                 message += " It is well-utilized, but should not be a bottleneck."
-                fe.message(NvRules.MsgType.OK, message, message_name)
+                msg_type = NvRules.MsgType.OK
             else:
                 if max_utilization_ac < bottleneck_utilization_threshold:
                     message_name = "High Utilization"
@@ -348,8 +398,12 @@ def apply(handle):
                         message += " Comparing the two, the overall pipeline utilization appears to be caused by frequent, low-latency instructions."
 
                 message += doc_msg + inst_section_msg + stall_msg
-                msg_id = fe.message(NvRules.MsgType.OPTIMIZATION, message, message_name)
+                msg_id = fe.message(msg_type, message, message_name)
 
+                if max_pipe_inst is not None:
+                    add_instructions_table_and_source_markers(
+                        msg_id, fe, ctx.backend(), action, metrics, max_pipe_inst.name
+                    )
 
                 fe.focus_metric(
                     msg_id,

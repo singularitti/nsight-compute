@@ -233,7 +233,13 @@ class ByOpcodeMetricAggregator(MetricAggregator):
         relevant_pcs = set()
         for opcode in opcodes:
             # only consider PCs of the given opcodes that also have a metric value
+            # First try exact match
             pcs_for_opcode = self._opcode_to_pcs.get(opcode, set())
+            # If no exact match, try prefix matching
+            if not pcs_for_opcode:
+                for cache_opcode, cache_pcs in self._opcode_to_pcs.items():
+                    if cache_opcode.startswith(opcode + ".") or cache_opcode == opcode:
+                        pcs_for_opcode = pcs_for_opcode.union(cache_pcs)
             for pc in pcs_for_opcode:
                 if pc in self._pc_to_metric_value.keys():
                     relevant_pcs.add(pc)
